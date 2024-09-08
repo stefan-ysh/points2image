@@ -1,0 +1,14 @@
+.idea/
+*.iml
+*.swp
+*.swo
+*.class
+*.lock
+*.log
+.venv/
+venv/
+*.pyc
+*.pyo
+*.pyd
+dist/
+build/
