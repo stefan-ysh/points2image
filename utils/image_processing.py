@@ -1,9 +1,20 @@
 import numpy as np
 
 
-def gaussian_filter(input, sigma):
-    """Simple Gaussian filter implementation using NumPy"""
-    x, y = np.mgrid[-sigma:sigma+1, -sigma:sigma+1]
-    g = np.exp(-(x**2/float(sigma)+y**2/float(sigma)))
-    g = g / g.sum()
-    return np.convolve(input.flatten(), g.flatten(), mode='same').reshape(input.shape)
+class GaussianFilter:
+    def __init__(self, sigma):
+        self.sigma = sigma
+        self.kernel = self._create_kernel()
+
+    def _create_kernel(self):
+        x, y = np.mgrid[-self.sigma:self.sigma+1, -self.sigma:self.sigma+1]
+        g = np.exp(-(x**2/float(self.sigma)+y**2/float(self.sigma)))
+        return g / g.sum()
+
+    def apply(self, input):
+        """Apply Gaussian filter to the input image"""
+        return np.convolve(input.flatten(), self.kernel.flatten(), mode='same').reshape(input.shape)
+
+# 使用示例：
+# gaussian_filter = GaussianFilter(sigma=1.5)
+# filtered_image = gaussian_filter.apply(input_image)

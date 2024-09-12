@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import tkinter as tk
 from tkinter import colorchooser
-from utils.image_processing import gaussian_filter
+from utils.image_processing import GaussianFilter
 
 
 class Plot3D:
@@ -18,7 +18,7 @@ class Plot3D:
         Z = (Z - Z.min()) / (Z.max() - Z.min())
         Z = 1 - Z
         Z = np.power(Z, 0.5)
-        Z = gaussian_filter(Z, sigma=1)
+        Z = GaussianFilter(sigma=1).apply(Z)
         return Z
 
     def create_grid(self, Z):
