@@ -3,88 +3,106 @@ import pyvista as pv
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import tkinter as tk
-from tkinter import colorchooser, Toplevel
+from tkinter import colorchooser
 from utils.image_processing import gaussian_filter
 
 
-def show_3d_plot(img):
-    # Normalize the image
-    Z = img.astype(np.float32)  # 修改这一行
-    Z = (Z - Z.min()) / (Z.max() - Z.min())
+class Plot3D:
+    def __init__(self, img):
+        self.img = img
+        self.p = pv.Plotter()
+        self.grid = None
 
-    # Invert the values so that ridges are higher than valleys
-    Z = 1 - Z
+    def preprocess_image(self):
+        Z = self.img.astype(np.float32)
+        Z = (Z - Z.min()) / (Z.max() - Z.min())
+        Z = 1 - Z
+        Z = np.power(Z, 0.5)
+        Z = gaussian_filter(Z, sigma=1)
+        return Z
 
-    # Enhance contrast
-    Z = np.power(Z, 0.5)
+    def create_grid(self, Z):
+        y, x = np.mgrid[: Z.shape[0], : Z.shape[1]]
+        self.grid = pv.StructuredGrid(
+            x.astype(np.float32), y.astype(np.float32), (Z * 50).astype(np.float32)
+        )
+        self.grid["elevation"] = Z.ravel(order="F")
 
-    # Apply Gaussian smoothing
-    Z = gaussian_filter(Z, sigma=1)
-
-    # Create a grid
-    y, x = np.mgrid[:Z.shape[0], :Z.shape[1]]
-
-    # Create PyVista grid
-    grid = pv.StructuredGrid(x.astype(np.float32), y.astype(np.float32), (Z * 50).astype(np.float32))  # 修改这一行
-    grid["elevation"] = Z.ravel(order="F")
-
-    # Create PyVista plotter
-    p = pv.Plotter()
-
-    # Function to update the color map
-    def update_color(color_or_cmap):
+    def update_color(self, color_or_cmap):
         if isinstance(color_or_cmap, str) and color_or_cmap in plt.colormaps():
-            # If it's a valid colormap name, use it directly
             cmap = color_or_cmap
         else:
-            # If it's a color, create a custom colormap
             try:
                 rgb = mcolors.to_rgb(color_or_cmap)
                 cmap = plt.cm.colors.LinearSegmentedColormap.from_list(
-                    "custom", [(1, 1, 1), rgb])
+                    "custom", [(1, 1, 1), rgb]
+                )
             except ValueError:
-                print(
-                    f"Invalid color or colormap: {color_or_cmap}. Using default.")
-                cmap = 'coolwarm'
+                print(f"Invalid color or colormap: {color_or_cmap}. Using default.")
+                cmap = "coolwarm"
 
-        p.add_mesh(grid, cmap=cmap, smooth_shading=True,
-                   specular=1, specular_power=15)
-        p.render()
+        self.p.add_mesh(
+            self.grid, cmap=cmap, smooth_shading=True, specular=1, specular_power=15
+        )
+        self.p.render()
 
-    # Create a color chooser function
-    def choose_color():
+    def choose_color(self):
         color_window = tk.Toplevel()
         color_window.withdraw()
-        color_window.attributes('-topmost', True)
+        color_window.attributes("-topmost", True)
         color = colorchooser.askcolor(
-            title="Choose color for 3D plot", parent=color_window)[1]
+            title="Choose color for 3D plot", parent=color_window
+        )[1]
         color_window.destroy()
         if color:
-            update_color(color)
+            self.update_color(color)
 
-    # Add a key event to open color chooser
-    p.add_key_event('c', choose_color)
+    def setup_plot(self):
+        self.p.add_key_event("c", self.choose_color)
+        self.p.add_key_event("C", self.choose_color)
+        self.p.add_key_event("x", lambda: self.p.view_yx())
+        self.p.add_key_event("X", lambda: self.p.view_yx())
+        self.p.add_key_event("y", lambda: self.p.view_xz())
+        self.p.add_key_event("Y", lambda: self.p.view_xz())
+        self.p.add_key_event("z", lambda: self.p.view_xy())
+        self.p.add_key_event("Z", lambda: self.p.view_xy())
 
-    # Initial plot with default colormap
-    update_color('coolwarm')
+        self.update_color("coolwarm")
 
-    # Set up lighting for better 3D effect
-    light = pv.Light(position=(0, 0, 1), focal_point=(0, 0, 0), intensity=0.7)
-    p.add_light(light)
+        light = pv.Light(position=(0, 0, 1), focal_point=(0, 0, 0), intensity=0.7)
+        self.p.add_light(light)
 
-    # Set camera position for a view similar to the image
-    p.camera_position = [(grid.bounds[1]*0.7, grid.bounds[3]*1.3, grid.bounds[5]*2),
-                         (grid.center[0], grid.center[1], 0),
-                         (0, 1, 0)]
+        self.p.camera_position = [
+            (
+                self.grid.bounds[1] * 0.7,
+                self.grid.bounds[3] * 1.3,
+                self.grid.bounds[5] * 2,
+            ),
+            (self.grid.center[0], self.grid.center[1], 0),
+            (0, 1, 0),
+        ]
+        self.p.camera.zoom(1.2)
 
-    # Adjust the camera zoom
-    p.camera.zoom(1.2)
+        self.p.add_axes()
+        self.p.add_text(
+            "C: Change color\n"
+            "X, Y, Z: Change view\n"
+            "V: Reset view\n"
+            "W: Wireframe mode\n"
+            "S: Smooth shading\n"
+            "R: Reset camera position\n"
+            "Q or E: Quit\n"
+            "Middle-click & drag: Move\n",
+            font_size=8,
+        )
 
-    # Add axes
-    p.add_axes()
+    def show(self):
+        Z = self.preprocess_image()
+        self.create_grid(Z)
+        self.setup_plot()
+        self.p.show()
 
-    # Add text to inform user about the color change option
-    p.add_text("Press 'c' to change color", font_size=12)
 
-    # Show the plot
-    p.show()
+def show_3d_plot(img):
+    plot = Plot3D(img)
+    plot.show()
