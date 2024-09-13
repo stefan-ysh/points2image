@@ -82,14 +82,3 @@ For a complete list of dependencies, see the `requirements.txt` file.
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
-
-## Build
-
-```
-
-pyinstaller --onefile --windowed --icon ./logo.ico ./main.py -n Points2Image
-
-> 打包文件夹
-pyinstaller --onedir --windowed --icon ./logo.ico ./main.py -n Points2Image
-
-```
