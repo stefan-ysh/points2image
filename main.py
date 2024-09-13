@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import messagebox
 from utils.gui import create_gui
 from utils.launch_loading import show_loading_screen
 
@@ -27,7 +28,12 @@ class Application:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
 
     def run(self):
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
+
+    def on_closing(self):
+        if messagebox.askokcancel("Exit", "Are you sure to exit?"):
+            self.root.destroy()
 
 def main():
     app = Application()
