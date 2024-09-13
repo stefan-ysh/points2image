@@ -39,27 +39,25 @@ class Plot3D:
         
         # only change the theme when it is really changed
         if old_theme_index != self.current_theme_index:
-            # save the current camera position
-            camera_position = self.p.camera_position
+            # Apply the new theme to the existing plotter
+            self.p.theme = new_theme
             
-            # create a new plotter object, using the new theme
-            new_plotter = pv.Plotter(theme=new_theme)
+            # Update the background color
+            self.p.background_color = new_theme.background
             
-            # copy all contents of the current plotter to the new plotter
-            new_plotter.add_mesh(self.grid, scalars=self.grid["elevation"], cmap=self.p.mapper.lookup_table, clim=self.p.mapper.scalar_range)
+            # Update the text color for all existing text actors
+            for actor in self.p.renderer.GetActors():
+                if isinstance(actor, pv.TextActor):
+                    actor.GetTextProperty().SetColor(new_theme.font.color)
             
-            # set the same camera position
-            new_plotter.camera_position = camera_position
+            # Update axes colors if present
+            if self.p.renderer.GetAxes():
+                self.p.renderer.GetAxes().GetXAxisCaptionActor2D().GetCaptionTextProperty().SetColor(new_theme.font.color)
+                self.p.renderer.GetAxes().GetYAxisCaptionActor2D().GetCaptionTextProperty().SetColor(new_theme.font.color)
+                self.p.renderer.GetAxes().GetZAxisCaptionActor2D().GetCaptionTextProperty().SetColor(new_theme.font.color)
             
-            # close the old plotter and replace it with the new one
-            self.p.close()
-            self.p = new_plotter
-            
-            # reset the keyboard events
-            self.setup_plot()
-            
-            # show the new plotter
-            self.p.show(auto_close=False)
+            # Force a redraw of the scene
+            self.p.render()
             
             print(f"Theme changed to: {type(new_theme).__name__}")
         else:
