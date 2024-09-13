@@ -9,14 +9,61 @@ import random
 
 
 class Plot3D:
-    def __init__(self, img):
+    def __init__(self, img, theme='document'):
         self.img = img
-        self.p = pv.Plotter()
+        self.themes = [pv.themes.Theme(), pv.themes.DocumentTheme(), pv.themes.DarkTheme(), pv.themes.ParaViewTheme()]
+        self.current_theme_index = 0
+        self.change_theme(theme)
         self.grid = None
         self.default_colors = ["#3B4CC0", "#6788EE", "#B4B4B4", "#EA8169", "#B40426"]
         self.color_list = self.default_colors.copy()
         self.color_window = None
         self.temp_color_list = []
+
+    def change_theme(self, theme):
+        if isinstance(theme, str):
+            if theme == 'document':
+                self.current_theme_index = 1
+            elif theme == 'dark':
+                self.current_theme_index = 2
+            elif theme == 'paraview':
+                self.current_theme_index = 3
+            else:
+                self.current_theme_index = 0
+        self.p = pv.Plotter(theme=self.themes[self.current_theme_index])
+
+    def cycle_theme(self):
+        old_theme_index = self.current_theme_index
+        self.current_theme_index = (self.current_theme_index + 1) % len(self.themes)
+        new_theme = self.themes[self.current_theme_index]
+        
+        # only change the theme when it is really changed
+        if old_theme_index != self.current_theme_index:
+            # save the current camera position
+            camera_position = self.p.camera_position
+            
+            # create a new plotter object, using the new theme
+            new_plotter = pv.Plotter(theme=new_theme)
+            
+            # copy all contents of the current plotter to the new plotter
+            new_plotter.add_mesh(self.grid, scalars=self.grid["elevation"], cmap=self.p.mapper.lookup_table, clim=self.p.mapper.scalar_range)
+            
+            # set the same camera position
+            new_plotter.camera_position = camera_position
+            
+            # close the old plotter and replace it with the new one
+            self.p.close()
+            self.p = new_plotter
+            
+            # reset the keyboard events
+            self.setup_plot()
+            
+            # show the new plotter
+            self.p.show(auto_close=False)
+            
+            print(f"Theme changed to: {type(new_theme).__name__}")
+        else:
+            print("Theme unchanged")
 
     def preprocess_image(self):
         Z = self.img.astype(np.float32)
@@ -190,7 +237,11 @@ class Plot3D:
         self.p.add_key_event("l", self.handle_l_key)
         self.p.add_key_event("L", self.handle_l_key)
         
-        # Keep other keyboard events unchanged
+        # Use 'T' key to cycle themes
+        self.p.add_key_event("t", self.cycle_theme)
+        self.p.add_key_event("T", self.cycle_theme)
+        
+        #  Keep other keyboard events unchanged
         self.p.add_key_event("x", lambda: self.p.view_yx())
         self.p.add_key_event("X", lambda: self.p.view_yx())
         self.p.add_key_event("y", lambda: self.p.view_xz())
@@ -224,6 +275,7 @@ class Plot3D:
             "W: Wireframe mode\n"
             "S: Smooth shading\n"
             "R: Reset camera position\n"
+            "T: Change theme\n"
             "Q or E: Quit\n"
             "Middle-click & drag: Move\n",
             font_size=8,
