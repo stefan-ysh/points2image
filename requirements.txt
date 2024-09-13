@@ -1,5 +1,6 @@
 matplotlib==3.8.3
-numpy==2.1.1
+numpy==1.26.4
 pandas==2.2.2
 Pillow==10.4.0
 pyvista==0.43.3
+openpyxl==3.1.5
