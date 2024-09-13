@@ -123,27 +123,41 @@ class Plot3D:
             update_color_buttons()
 
         def update_color_buttons():
-            for button in self.color_buttons:
-                button.destroy()
-            self.color_buttons.clear()
+            # Remove excess buttons
+            while len(self.color_buttons) > len(self.temp_color_list):
+                self.color_buttons[-1].destroy()
+                self.color_buttons.pop()
 
+            # Update existing buttons and add new ones if needed
             for i, color in enumerate(self.temp_color_list):
-                frame = ttk.Frame(self.color_window)
-                frame.pack(fill=tk.X, padx=5, pady=2)
+                if i < len(self.color_buttons):
+                    # Update existing button
+                    frame = self.color_buttons[i]
+                    color_btn = frame.winfo_children()[0]
+                    color_btn.configure(bg=color, command=lambda idx=i: edit_color(idx))
+                else:
+                    # Create new button
+                    frame = ttk.Frame(self.color_window)
+                    frame.pack(fill=tk.X, padx=5, pady=2)
 
-                color_btn = tk.Button(frame, bg=color, command=lambda idx=i: edit_color(idx))
-                color_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+                    color_btn = tk.Button(frame, bg=color, command=lambda idx=i: edit_color(idx))
+                    color_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 
-                up_btn = ttk.Button(frame, text="↑", width=3, command=lambda idx=i: move_color(idx, "up"))
-                up_btn.pack(side=tk.LEFT, padx=(0, 2))
+                    up_btn = ttk.Button(frame, text="↑", width=3, command=lambda idx=i: move_color(idx, "up"))
+                    up_btn.pack(side=tk.LEFT, padx=(0, 2))
 
-                down_btn = ttk.Button(frame, text="↓", width=3, command=lambda idx=i: move_color(idx, "down"))
-                down_btn.pack(side=tk.LEFT, padx=(0, 2))
+                    down_btn = ttk.Button(frame, text="↓", width=3, command=lambda idx=i: move_color(idx, "down"))
+                    down_btn.pack(side=tk.LEFT, padx=(0, 2))
 
-                remove_btn = ttk.Button(frame, text="Remove", command=lambda idx=i: remove_color(idx))
-                remove_btn.pack(side=tk.RIGHT)
+                    remove_btn = ttk.Button(frame, text="Remove", command=lambda idx=i: remove_color(idx))
+                    remove_btn.pack(side=tk.RIGHT)
 
-                self.color_buttons.append(frame)
+                    self.color_buttons.append(frame)
+
+                # Update button commands
+                frame.winfo_children()[1].configure(command=lambda idx=i: move_color(idx, "up"))
+                frame.winfo_children()[2].configure(command=lambda idx=i: move_color(idx, "down"))
+                frame.winfo_children()[3].configure(command=lambda idx=i: remove_color(idx))
 
         def apply_colors():
             if self.validate_colors(self.temp_color_list):
