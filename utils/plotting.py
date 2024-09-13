@@ -1,10 +1,11 @@
 import numpy as np
 import pyvista as pv
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 import tkinter as tk
+from tkinter import ttk
 from tkinter import colorchooser
 from utils.image_processing import GaussianFilter
+import random
 
 
 class Plot3D:
@@ -12,12 +13,16 @@ class Plot3D:
         self.img = img
         self.p = pv.Plotter()
         self.grid = None
+        self.default_colors = ["#3B4CC0", "#6788EE", "#B4B4B4", "#EA8169", "#B40426"]
+        self.color_list = self.default_colors.copy()
+        self.color_window = None
+        self.temp_color_list = []
 
     def preprocess_image(self):
         Z = self.img.astype(np.float32)
         Z = (Z - Z.min()) / (Z.max() - Z.min())
         Z = 1 - Z
-        Z = np.power(Z, 0.5)
+        Z = np.sqrt(Z)  # faster than np.power(Z, 0.5)
         Z = GaussianFilter(sigma=1).apply(Z)
         return Z
 
@@ -28,46 +33,174 @@ class Plot3D:
         )
         self.grid["elevation"] = Z.ravel(order="F")
 
-    def update_color(self, color_or_cmap):
-        if isinstance(color_or_cmap, str) and color_or_cmap in plt.colormaps():
-            cmap = color_or_cmap
-        else:
-            try:
-                rgb = mcolors.to_rgb(color_or_cmap)
-                cmap = plt.cm.colors.LinearSegmentedColormap.from_list(
-                    "custom", [(1, 1, 1), rgb]
-                )
-            except ValueError:
-                print(f"Invalid color or colormap: {color_or_cmap}. Using default.")
-                cmap = "coolwarm"
+    def choose_colors(self):
+        if self.color_window is not None and self.color_window.winfo_exists():
+            self.color_window.lift()
+            self.color_window.focus_force()
+            return
 
+        self.color_window = tk.Toplevel()
+        self.color_window.title("Choose colors for 3D plot")
+        self.color_window.geometry("300x400")
+
+        self.color_buttons = []
+        self.temp_color_list = self.color_list.copy()
+
+        def add_random_color():
+            color = self.generate_random_color()
+            self.temp_color_list.append(color)
+            update_color_buttons()
+
+        def edit_color(index):
+            new_color = self.pick_color(initial_color=self.temp_color_list[index])
+            if new_color:
+                self.temp_color_list[index] = new_color
+                update_color_buttons()
+
+        def remove_color(index):
+            del self.temp_color_list[index]
+            update_color_buttons()
+
+        def reset_to_default():
+            self.temp_color_list = self.default_colors.copy()
+            self.color_list = self.default_colors.copy()
+            self.update_color(self.color_list)
+            self.color_window.destroy()
+            self.color_window = None
+
+        def move_color(index, direction):
+            if direction == "up" and index > 0:
+                self.temp_color_list[index], self.temp_color_list[index-1] = self.temp_color_list[index-1], self.temp_color_list[index]
+            elif direction == "down" and index < len(self.temp_color_list) - 1:
+                self.temp_color_list[index], self.temp_color_list[index+1] = self.temp_color_list[index+1], self.temp_color_list[index]
+            update_color_buttons()
+
+        def update_color_buttons():
+            for button in self.color_buttons:
+                button.destroy()
+            self.color_buttons.clear()
+
+            for i, color in enumerate(self.temp_color_list):
+                frame = ttk.Frame(self.color_window)
+                frame.pack(fill=tk.X, padx=5, pady=2)
+
+                color_btn = tk.Button(frame, bg=color, command=lambda idx=i: edit_color(idx))
+                color_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+
+                up_btn = ttk.Button(frame, text="↑", width=3, command=lambda idx=i: move_color(idx, "up"))
+                up_btn.pack(side=tk.LEFT, padx=(0, 2))
+
+                down_btn = ttk.Button(frame, text="↓", width=3, command=lambda idx=i: move_color(idx, "down"))
+                down_btn.pack(side=tk.LEFT, padx=(0, 2))
+
+                remove_btn = ttk.Button(frame, text="Remove", command=lambda idx=i: remove_color(idx))
+                remove_btn.pack(side=tk.RIGHT)
+
+                self.color_buttons.append(frame)
+
+        def apply_colors():
+            if self.validate_colors(self.temp_color_list):
+                self.color_list = self.temp_color_list.copy()
+                self.update_color(self.color_list)
+                self.color_window.destroy()
+                self.color_window = None
+            else:
+                tk.messagebox.showwarning("Invalid Color Selection", "Please select at least two different colors.")
+
+        button_frame = ttk.Frame(self.color_window)
+        button_frame.pack(pady=10)
+
+        add_button = ttk.Button(button_frame, text="Add Color", command=add_random_color)
+        add_button.pack(side=tk.LEFT, padx=5)
+
+        reset_button = ttk.Button(button_frame, text="Reset", command=reset_to_default)
+        reset_button.pack(side=tk.LEFT, padx=5)
+
+        apply_button = ttk.Button(button_frame, text="Apply", command=apply_colors)
+        apply_button.pack(side=tk.LEFT, padx=5)
+
+        self.color_window.style = ttk.Style()
+        update_color_buttons()
+        self.color_window.protocol("WM_DELETE_WINDOW", self.on_color_window_close)
+        self.color_window.grab_set()
+        self.color_window.wait_window()
+
+    def generate_random_color(self):
+        return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
+    def pick_color(self, initial_color=None):
+        while True:
+            color = colorchooser.askcolor(title="Pick a color", initialcolor=initial_color)[1]
+            if color is None:  # User cancelled
+                return None
+            return color
+
+
+    # validate selected color_list is valid or not
+    def validate_colors(self, color_list):
+        '''
+            1. at least two colors selected
+            2. if two colors selected, they must be different
+        '''
+        if len(color_list) == 2:
+            return color_list[0] != color_list[1]
+        return len(color_list) >= 2
+
+
+    def update_color(self, colors):
+        if not colors or len(colors) < 2:
+            print("Not enough colors selected. Using default.")
+            colors = self.default_colors
+
+        # create a custom color map with user selected colors
+        cmap = plt.cm.colors.LinearSegmentedColormap.from_list("custom", colors, N=256)
+
+        # normalize the data to the range [0, 1]
+        scalar_range = self.grid.get_data_range("elevation")
+        normalized_elevation = (self.grid["elevation"] - scalar_range[0]) / (scalar_range[1] - scalar_range[0])
+
+        # this function is used to update the color map of the 3D image
         self.p.add_mesh(
-            self.grid, cmap=cmap, smooth_shading=True, specular=1, specular_power=15
+            self.grid,
+            scalars=normalized_elevation,
+            cmap=cmap,
+            clim=[0, 1],
+            smooth_shading=True,
+            specular=1,
+            specular_power=15,
         )
         self.p.render()
 
-    def choose_color(self):
-        color_window = tk.Toplevel()
-        color_window.withdraw()
-        color_window.attributes("-topmost", True)
-        color = colorchooser.askcolor(
-            title="Choose color for 3D plot", parent=color_window
-        )[1]
-        color_window.destroy()
-        if color:
-            self.update_color(color)
+    def on_color_window_close(self):
+        if self.color_window:
+            self.color_window.destroy()
+        self.color_window = None
+        # do not apply the changes of the temporary color list
+        self.temp_color_list = []
 
     def setup_plot(self):
-        self.p.add_key_event("c", self.choose_color)
-        self.p.add_key_event("C", self.choose_color)
+        # disable all picking functions
+        self.p.disable_picking()
+        
+        # Redefine 'C' key behavior to no operation
+        self.p.add_key_event('c', lambda: None)
+        self.p.add_key_event('C', lambda: None)
+        
+        # Use 'L' key to trigger color selection
+        self.p.add_key_event("l", self.handle_l_key)
+        self.p.add_key_event("L", self.handle_l_key)
+        
+        # Keep other keyboard events unchanged
         self.p.add_key_event("x", lambda: self.p.view_yx())
         self.p.add_key_event("X", lambda: self.p.view_yx())
         self.p.add_key_event("y", lambda: self.p.view_xz())
         self.p.add_key_event("Y", lambda: self.p.view_xz())
         self.p.add_key_event("z", lambda: self.p.view_xy())
         self.p.add_key_event("Z", lambda: self.p.view_xy())
+        self.p.add_key_event("v", lambda: self.p.isometric_view())
+        self.p.add_key_event("V", lambda: self.p.isometric_view())
 
-        self.update_color("coolwarm")
+        self.update_color(self.color_list)
 
         light = pv.Light(position=(0, 0, 1), focal_point=(0, 0, 0), intensity=0.7)
         self.p.add_light(light)
@@ -85,7 +218,7 @@ class Plot3D:
 
         self.p.add_axes()
         self.p.add_text(
-            "C: Change color\n"
+            "L: Change color\n"
             "X, Y, Z: Change view\n"
             "V: Reset view\n"
             "W: Wireframe mode\n"
@@ -95,6 +228,13 @@ class Plot3D:
             "Middle-click & drag: Move\n",
             font_size=8,
         )
+
+    def handle_l_key(self):
+        if self.color_window is None or not self.color_window.winfo_exists():
+            self.choose_colors()
+        else:
+            self.color_window.lift()
+            self.color_window.focus_force()
 
     def show(self):
         Z = self.preprocess_image()
