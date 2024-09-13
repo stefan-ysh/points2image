@@ -256,15 +256,8 @@ class Plot3D:
         light = pv.Light(position=(0, 0, 1), focal_point=(0, 0, 0), intensity=0.7)
         self.p.add_light(light)
 
-        self.p.camera_position = [
-            (
-                self.grid.bounds[1] * 0.7,
-                self.grid.bounds[3] * 1.3,
-                self.grid.bounds[5] * 2,
-            ),
-            (self.grid.center[0], self.grid.center[1], 0),
-            (0, 1, 0),
-        ]
+        # Replace the current camera position setting with isometric view
+        self.p.camera_position = 'iso'
         self.p.camera.zoom(1.2)
 
         self.p.add_axes()
