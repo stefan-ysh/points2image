@@ -103,7 +103,7 @@ def import_and_draw_images(root):
 
 def save_image(img, filename):
     # Remove file extension from the original filename
-    base_filename = os.path.splitext(filename)[0]
+    base_filename = os.path.splitext(os.path.basename(filename))[0]
 
     # Ask user for save location
     save_path = filedialog.asksaveasfilename(
@@ -113,6 +113,9 @@ def save_image(img, filename):
     )
 
     if save_path:
-        # Save the image
-        Image.fromarray(img).save(save_path)
-        messagebox.showinfo("Save Successful", f"Image saved as {save_path}")
+        try:
+            # Save the image
+            Image.fromarray(img).save(save_path)
+            messagebox.showinfo("Save Successful", f"Image saved as {save_path}")
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Failed to save image: {str(e)}")
