@@ -56,6 +56,12 @@ A tool for converting point cloud data to grayscale images and visualizing them 
 
 ## Building Executable
 
+> **Note:** If you want to build a standalone executable, you need to install `PyInstaller` first.And open a new terminal in the project directory.
+
+```
+pip install pyinstaller
+```
+
 To create a standalone executable:
 
 ```
