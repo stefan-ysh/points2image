@@ -86,7 +86,7 @@ def import_and_draw_images(root):
                 progress_window.destroy()
                 return
             
-            progress_label.config(text=f"Analysising file {i}/{total_files}")
+            progress_label.config(text=f"Analyzing file {i}/{total_files}")
             progress_bar['value'] = (i / total_files) * 100
             progress_window.update()
 
