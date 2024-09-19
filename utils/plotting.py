@@ -22,6 +22,7 @@ class Plot3D:
         self.temp_color_list = []
         self.render_mode = 'surface'
         self.render_mode_text = None
+        self.elevation_scale = 50  # Default scale factor
 
     def change_theme(self, theme):
         if isinstance(theme, str):
@@ -99,9 +100,37 @@ class Plot3D:
     def create_grid(self, Z):
         y, x = np.mgrid[: Z.shape[0], : Z.shape[1]]
         self.grid = pv.StructuredGrid(
-            x.astype(np.float32), y.astype(np.float32), (Z * 50).astype(np.float32)
+            x.astype(np.float32), y.astype(np.float32), (Z * self.elevation_scale).astype(np.float32)
         )
         self.grid["elevation"] = Z.ravel(order="F")
+
+    def update_elevation(self, scale):
+        self.elevation_scale = scale
+        Z = self.grid["elevation"].reshape(self.img.shape, order="F")
+        
+        # Recreate the grid with the new elevation scale
+        y, x = np.mgrid[: Z.shape[0], : Z.shape[1]]
+        self.grid = pv.StructuredGrid(
+            x.astype(np.float32), y.astype(np.float32), (Z * self.elevation_scale).astype(np.float32)
+        )
+        self.grid["elevation"] = Z.ravel(order="F")
+        
+        # Update the mesh for all render modes
+        if hasattr(self, 'mesh_actor'):
+            self.p.remove_actor(self.mesh_actor)
+        
+        self.mesh_actor = self.p.add_mesh(
+            self.grid,
+            scalars=self.grid["elevation"],
+            cmap=self.current_cmap,
+            clim=self.scalar_range,
+            smooth_shading=(self.render_mode == 'surface'),
+            style=self.render_mode,
+            specular=1,
+            specular_power=15,
+        )
+        
+        self.p.render()
 
     def choose_colors(self):
         if self.color_window is not None and self.color_window.winfo_exists():
@@ -260,36 +289,19 @@ class Plot3D:
         # Save current camera position
         camera_position = self.p.camera_position
 
-        self.p.clear_actors()
+        if hasattr(self, 'mesh_actor'):
+            self.p.remove_actor(self.mesh_actor)
         
-        if self.render_mode == 'surface':
-            self.p.add_mesh(
-                self.grid,
-                scalars=self.grid["elevation"],
-                cmap=self.current_cmap,
-                clim=self.scalar_range,
-                smooth_shading=True,
-                specular=1,
-                specular_power=15,
-            )
-        elif self.render_mode == 'wireframe':
-            self.p.add_mesh(
-                self.grid,
-                scalars=self.grid["elevation"],
-                cmap=self.current_cmap,
-                clim=self.scalar_range,
-                style='wireframe',
-                line_width=1,
-            )
-        elif self.render_mode == 'points':
-            self.p.add_mesh(
-                self.grid,
-                scalars=self.grid["elevation"],
-                cmap=self.current_cmap,
-                clim=self.scalar_range,
-                style='points',
-                point_size=3,
-            )
+        self.mesh_actor = self.p.add_mesh(
+            self.grid,
+            scalars=self.grid["elevation"],
+            cmap=self.current_cmap,
+            clim=self.scalar_range,
+            smooth_shading=(self.render_mode == 'surface'),
+            style=self.render_mode,
+            specular=1,
+            specular_power=15,
+        )
         
         # Restore camera position
         self.p.camera_position = camera_position
@@ -309,7 +321,8 @@ class Plot3D:
             "R: Reset camera position\n"
             "T: Change theme\n"
             "Q or E: Quit\n"
-            "Middle-click & drag: Move\n",
+            "Middle-click & drag: Move\n"
+            "Slider: Adjust elevation",
             font_size=8,
         )
 
@@ -354,6 +367,19 @@ class Plot3D:
 
         self.p.add_axes()
         self.add_help_text()
+
+        # Add elevation slider
+        self.p.add_slider_widget(
+            self.update_elevation,
+            [1, 100],
+            value=self.elevation_scale,
+            # title="Elevation",
+            pointa=(0.98, 0.1),  # 右侧底部
+            pointb=(0.98, 0.9),  # 右侧顶部
+            style='modern',
+            tube_width=0.02,
+            interaction_event='end' 
+        )
 
     def handle_l_key(self):
         if self.color_window is None or not self.color_window.winfo_exists():
