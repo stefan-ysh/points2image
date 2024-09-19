@@ -9,8 +9,9 @@ import random
 
 
 class Plot3D:
-    def __init__(self, img, theme='document'):
+    def __init__(self, img, filename, theme='document'):
         self.img = img
+        self.filename = filename
         self.themes = [pv.themes.Theme(), pv.themes.DocumentTheme(), pv.themes.DarkTheme(), pv.themes.ParaViewTheme()]
         self.current_theme_index = 0
         self.change_theme(theme)
@@ -31,6 +32,7 @@ class Plot3D:
             else:
                 self.current_theme_index = 0
         self.p = pv.Plotter(theme=self.themes[self.current_theme_index])
+        self.p.add_title(self.filename, font_size=12)
 
     def cycle_theme(self):
         old_theme_index = self.current_theme_index
@@ -300,6 +302,6 @@ class Plot3D:
         self.p.show()
 
 
-def show_3d_plot(img):
-    plot = Plot3D(img)
+def show_3d_plot(img, filename):
+    plot = Plot3D(img, filename)
     plot.show()

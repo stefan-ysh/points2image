@@ -53,7 +53,7 @@ def show_images(root, images):
         filename_label.grid(row=0, column=0, sticky='ew')
         
         # Add buttons to the right
-        show_3d_button = tk.Button(header_frame, text="3D Model", command=lambda img=img: show_3d_plot(img), width=10)
+        show_3d_button = tk.Button(header_frame, text="3D Model", command=lambda img=img, filename=filename: show_3d_plot(img, filename), width=10)
         show_3d_button.grid(row=0, column=1, padx=(0, 5))
         
         save_button = tk.Button(header_frame, text="Save Image",
@@ -87,7 +87,7 @@ def show_images(root, images):
             filename_label.grid(row=0, column=0, sticky='ew')
             
             # Add buttons to the right
-            show_3d_button = tk.Button(header_frame, text="3D Model", command=lambda img=img: show_3d_plot(img), width=10)
+            show_3d_button = tk.Button(header_frame, text="3D Model", command=lambda img=img, filename=filename: show_3d_plot(img, filename), width=10)
             show_3d_button.grid(row=0, column=1, padx=(0, 5))
             
             save_button = tk.Button(header_frame, text="Save Image",
