@@ -20,6 +20,8 @@ class Plot3D:
         self.color_list = self.default_colors.copy()
         self.color_window = None
         self.temp_color_list = []
+        self.render_mode = 'surface'
+        self.render_mode_text = None
 
     def change_theme(self, theme):
         if isinstance(theme, str):
@@ -31,7 +33,8 @@ class Plot3D:
                 self.current_theme_index = 3
             else:
                 self.current_theme_index = 0
-        self.p = pv.Plotter(theme=self.themes[self.current_theme_index])
+        self.p = pv.Plotter(theme=self.themes[self.current_theme_index], window_size=[1024, 768])
+        self.p.window_size = [1024, 768]
         self.p.add_title(self.filename, font_size=12)
 
     def cycle_theme(self):
@@ -48,15 +51,20 @@ class Plot3D:
             self.p.background_color = new_theme.background
             
             # Update the text color for all existing text actors
+            text_color = self.get_contrasting_color(new_theme.background)
+            
             for actor in self.p.renderer.GetActors():
                 if actor.GetClassName() == 'vtkTextActor':
-                    actor.GetTextProperty().SetColor(new_theme.font.color)
+                    actor.GetTextProperty().SetColor(text_color)
             
             # Update axes colors if present
             for actor in self.p.renderer.GetActors():
                 if isinstance(actor, pv.AxesActor):
                     for axis in [actor.GetXAxisCaptionActor2D(), actor.GetYAxisCaptionActor2D(), actor.GetZAxisCaptionActor2D()]:
-                        axis.GetCaptionTextProperty().SetColor(new_theme.font.color)
+                        axis.GetCaptionTextProperty().SetColor(text_color)
+            
+            # Update title color
+            self.update_title_color(text_color)
             
             # Force a redraw of the scene
             self.p.render()
@@ -64,6 +72,21 @@ class Plot3D:
             print(f"Theme changed to: {type(new_theme).__name__}")
         else:
             print("Theme unchanged")
+
+    def get_contrasting_color(self, background_color):
+        # Convert background color to brightness
+        brightness = np.dot(background_color[:3], [0.299, 0.587, 0.114])
+        
+        # Return white if background is dark, otherwise return black
+        return (1, 1, 1) if brightness < 0.5 else (0, 0, 0)
+
+    def update_title_color(self, color):
+        # Find and update the color of the title actor
+        for actor in self.p.renderer.GetActors():
+            if actor.GetClassName() == 'vtkTextActor':
+                # Assume the first text actor is the title
+                actor.GetTextProperty().SetColor(color)
+                break
 
     def preprocess_image(self):
         Z = self.img.astype(np.float32)
@@ -214,23 +237,11 @@ class Plot3D:
             colors = self.default_colors
 
         # create a custom color map with user selected colors
-        cmap = plt.cm.colors.LinearSegmentedColormap.from_list("custom", colors, N=256)
+        self.current_cmap = plt.cm.colors.LinearSegmentedColormap.from_list("custom", colors, N=256)
 
         # normalize the data to the range [0, 1]
-        scalar_range = self.grid.get_data_range("elevation")
-        normalized_elevation = (self.grid["elevation"] - scalar_range[0]) / (scalar_range[1] - scalar_range[0])
-
-        # this function is used to update the color map of the 3D image
-        self.p.add_mesh(
-            self.grid,
-            scalars=normalized_elevation,
-            cmap=cmap,
-            clim=[0, 1],
-            smooth_shading=True,
-            specular=1,
-            specular_power=15,
-        )
-        self.p.render()
+        self.scalar_range = self.grid.get_data_range("elevation")
+        self.update_render_mode()
 
     def on_color_window_close(self):
         if self.color_window:
@@ -238,6 +249,69 @@ class Plot3D:
         self.color_window = None
         # do not apply the changes of the temporary color list
         self.temp_color_list = []
+
+    def cycle_render_mode(self):
+        modes = ['surface', 'wireframe', 'points']
+        current_index = modes.index(self.render_mode)
+        self.render_mode = modes[(current_index + 1) % len(modes)]
+        self.update_render_mode()
+
+    def update_render_mode(self):
+        # Save current camera position
+        camera_position = self.p.camera_position
+
+        self.p.clear_actors()
+        
+        if self.render_mode == 'surface':
+            self.p.add_mesh(
+                self.grid,
+                scalars=self.grid["elevation"],
+                cmap=self.current_cmap,
+                clim=self.scalar_range,
+                smooth_shading=True,
+                specular=1,
+                specular_power=15,
+            )
+        elif self.render_mode == 'wireframe':
+            self.p.add_mesh(
+                self.grid,
+                scalars=self.grid["elevation"],
+                cmap=self.current_cmap,
+                clim=self.scalar_range,
+                style='wireframe',
+                line_width=1,
+            )
+        elif self.render_mode == 'points':
+            self.p.add_mesh(
+                self.grid,
+                scalars=self.grid["elevation"],
+                cmap=self.current_cmap,
+                clim=self.scalar_range,
+                style='points',
+                point_size=3,
+            )
+        
+        # Restore camera position
+        self.p.camera_position = camera_position
+        
+        # Re-add the axes and text
+        self.p.add_axes()
+        self.add_help_text()
+        
+        self.p.render()
+
+    def add_help_text(self):
+        self.p.add_text(
+            "L: Change color\n"
+            "X, Y, Z: Change view\n"
+            "V: Reset view\n"
+            "M: Change render mode\n"
+            "R: Reset camera position\n"
+            "T: Change theme\n"
+            "Q or E: Quit\n"
+            "Middle-click & drag: Move\n",
+            font_size=8,
+        )
 
     def setup_plot(self):
         # disable all picking functions
@@ -254,6 +328,10 @@ class Plot3D:
         # Use 'T' key to cycle themes
         self.p.add_key_event("t", self.cycle_theme)
         self.p.add_key_event("T", self.cycle_theme)
+        
+        # Add 'M' key to cycle render modes
+        self.p.add_key_event("m", self.cycle_render_mode)
+        self.p.add_key_event("M", self.cycle_render_mode)
         
         #  Keep other keyboard events unchanged
         self.p.add_key_event("x", lambda: self.p.view_yx())
@@ -275,18 +353,7 @@ class Plot3D:
         self.p.camera.zoom(1.2)
 
         self.p.add_axes()
-        self.p.add_text(
-            "L: Change color\n"
-            "X, Y, Z: Change view\n"
-            "V: Reset view\n"
-            "W: Wireframe mode\n"
-            "S: Smooth shading\n"
-            "R: Reset camera position\n"
-            "T: Change theme\n"
-            "Q or E: Quit\n"
-            "Middle-click & drag: Move\n",
-            font_size=8,
-        )
+        self.add_help_text()
 
     def handle_l_key(self):
         if self.color_window is None or not self.color_window.winfo_exists():
