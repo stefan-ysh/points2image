@@ -38,25 +38,25 @@ class Plot3D:
         old_theme_index = self.current_theme_index
         self.current_theme_index = (self.current_theme_index + 1) % len(self.themes)
         new_theme = self.themes[self.current_theme_index]
-        
+
         # only change the theme when it is really changed
         if old_theme_index != self.current_theme_index:
             # Apply the new theme to the existing plotter
             self.p.theme = new_theme
-            
+
             # Update the background color
             self.p.background_color = new_theme.background
             
             # Update the text color for all existing text actors
             for actor in self.p.renderer.GetActors():
-                if isinstance(actor, pv.TextActor):
+                if actor.GetClassName() == 'vtkTextActor':
                     actor.GetTextProperty().SetColor(new_theme.font.color)
             
             # Update axes colors if present
-            if self.p.renderer.GetAxes():
-                self.p.renderer.GetAxes().GetXAxisCaptionActor2D().GetCaptionTextProperty().SetColor(new_theme.font.color)
-                self.p.renderer.GetAxes().GetYAxisCaptionActor2D().GetCaptionTextProperty().SetColor(new_theme.font.color)
-                self.p.renderer.GetAxes().GetZAxisCaptionActor2D().GetCaptionTextProperty().SetColor(new_theme.font.color)
+            for actor in self.p.renderer.GetActors():
+                if isinstance(actor, pv.AxesActor):
+                    for axis in [actor.GetXAxisCaptionActor2D(), actor.GetYAxisCaptionActor2D(), actor.GetZAxisCaptionActor2D()]:
+                        axis.GetCaptionTextProperty().SetColor(new_theme.font.color)
             
             # Force a redraw of the scene
             self.p.render()
