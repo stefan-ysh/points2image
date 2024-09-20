@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('C:\\Users\\psh007\\AppData\\Local\\GitHubDesktop\\app-3.4.2\\points2image/logo.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
